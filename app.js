@@ -12,10 +12,11 @@ const sections={
 const states=['','AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC'];
 const vf=document.getElementById('vehicleFields');vehicle.forEach(([id,label])=>{const l=document.createElement('label');l.textContent=label;if(id==='state'){const s=document.createElement('select');s.id=id;states.forEach(x=>s.add(new Option(x,x)));l.appendChild(s)}else{const i=document.createElement('input');i.id=id;i.type=id==='date'?'date':id==='phone'?'tel':'text';l.appendChild(i)}vf.appendChild(l)});document.getElementById('date').value=new Date().toISOString().slice(0,10);
 const root=document.getElementById('sections');let idx=0;Object.entries(sections).forEach(([name,items])=>{const sec=document.createElement('section');sec.className='card';sec.innerHTML=`<h2>${name}</h2>`;items.forEach(title=>{const id='i'+idx++;const d=document.createElement('div');d.className='item';d.dataset.id=id;d.innerHTML=`<div class="item-title">${title}</div><div class="status"><button data-v="G" type="button">GREEN</button><button data-v="Y" type="button">YELLOW</button><button data-v="R" type="button">RED</button></div><div class="notes"><input class="measurement" placeholder="Measurement / notes"></div>`;d.querySelectorAll('.status button').forEach(b=>b.onclick=()=>{if(b.classList.contains('active')){b.classList.remove('active');updateCounts();autoSave();return;}d.querySelectorAll('.status button').forEach(x=>x.classList.remove('active'));b.classList.add('active');updateCounts();autoSave()});d.querySelector('input').addEventListener('input',autoSave);sec.appendChild(d)});root.appendChild(sec)});
-function data(){const out={vehicle:{},items:{},summary:summary.value,priority:priority.value,signature:signature.value,advised:advised.value};vehicle.forEach(([id])=>out.vehicle[id]=document.getElementById(id).value);document.querySelectorAll('.item').forEach(d=>out.items[d.dataset.id]={status:d.querySelector('.active')?.dataset.v||'',notes:d.querySelector('.measurement').value});return out}
-function restore(o){if(!o)return;Object.entries(o.vehicle||{}).forEach(([k,v])=>{if(document.getElementById(k))document.getElementById(k).value=v});Object.entries(o.items||{}).forEach(([id,v])=>{const d=document.querySelector(`[data-id="${id}"]`);if(d){if(v.status)d.querySelector(`[data-v="${v.status}"]`)?.classList.add('active');d.querySelector('.measurement').value=v.notes||''}});summary.value=o.summary||'';priority.value=o.priority||'';signature.value=o.signature||'';advised.value=o.advised||'';updateCounts()}
+function data(){const out={vehicle:{},items:{},photos:inspectionPhotos,summary:summary.value,priority:priority.value,signature:signature.value,advised:advised.value};vehicle.forEach(([id])=>out.vehicle[id]=document.getElementById(id).value);document.querySelectorAll('.item').forEach(d=>out.items[d.dataset.id]={status:d.querySelector('.active')?.dataset.v||'',notes:d.querySelector('.measurement').value});return out}
+function restore(o){if(!o)return;Object.assign(inspectionPhotos,o.photos||{});Object.entries(o.vehicle||{}).forEach(([k,v])=>{if(document.getElementById(k))document.getElementById(k).value=v});Object.entries(o.items||{}).forEach(([id,v])=>{const d=document.querySelector(`[data-id="${id}"]`);if(d){if(v.status)d.querySelector(`[data-v="${v.status}"]`)?.classList.add('active');d.querySelector('.measurement').value=v.notes||''}});summary.value=o.summary||'';priority.value=o.priority||'';signature.value=o.signature||'';advised.value=o.advised||'';updateCounts()}
 function autoSave(){localStorage.setItem('halesInspectionDraft',JSON.stringify(data()))}function updateCounts(){let c={G:0,Y:0,R:0,U:0};document.querySelectorAll('.item').forEach(d=>{const v=d.querySelector('.active')?.dataset.v;c[v||'U']++});counts.innerHTML=`<span class="pill">🟢 ${c.G} Good</span><span class="pill">🟡 ${c.Y} Monitor</span><span class="pill">🔴 ${c.R} Repair</span><span class="pill">${c.U} Unmarked</span>`}
 document.querySelectorAll('input,select,textarea').forEach(x=>x.addEventListener('change',autoSave));saveBtn.onclick=()=>{autoSave();alert('Inspection saved on this device.')};newBtn.onclick=()=>{if(confirm('Clear this inspection and start a new one?')){localStorage.removeItem('halesInspectionDraft');location.reload()}};reportBtn.onclick=()=>window.print();restore(JSON.parse(localStorage.getItem('halesInspectionDraft')||'null'));updateCounts();if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js');
+const inspectionPhotos = {};
 // SECTION-SPECIFIC INSPECTION PHOTO SYSTEM
 const PHOTO_MAX_WIDTH = 1200;
 const PHOTO_MAX_HEIGHT = 1200;
@@ -97,6 +98,10 @@ document.querySelectorAll('#sections .card').forEach(section => {
 
       compressInspectionPhoto(file, compressedPhoto => {
         const photo = document.createElement('div');
+        const sectionKey = sectionTitle.textContent;
+        if (!inspectionPhotos[sectionKey]) inspectionPhotos[sectionKey] = [];
+        inspectionPhotos[sectionKey].push({ image: compressedPhoto, notes: '' });
+        autoSave();
         photo.className = 'section-inspection-photo';
 
         photo.innerHTML = `
@@ -113,10 +118,12 @@ document.querySelectorAll('#sections .card').forEach(section => {
             Remove Photo
           </button>
         `;
-
-        photo
+        const photoRecord = inspectionPhotos[sectionKey][inspectionPhotos[sectionKey].length - 1];
+        photo.querySelector('textarea').addEventListener('input', e => { photoRecord.notes = e.target.value; autoSave(); });        photo
           .querySelector('.section-remove-photo')
           .addEventListener('click', () => {
+inspectionPhotos[sectionKey] = inspectionPhotos[sectionKey].filter(p => p !== photoRecord);
+            autoSave();
             photo.remove();
           });
 
