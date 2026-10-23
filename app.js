@@ -16,34 +16,114 @@ function data(){const out={vehicle:{},items:{},summary:summary.value,priority:pr
 function restore(o){if(!o)return;Object.entries(o.vehicle||{}).forEach(([k,v])=>{if(document.getElementById(k))document.getElementById(k).value=v});Object.entries(o.items||{}).forEach(([id,v])=>{const d=document.querySelector(`[data-id="${id}"]`);if(d){if(v.status)d.querySelector(`[data-v="${v.status}"]`)?.classList.add('active');d.querySelector('.measurement').value=v.notes||''}});summary.value=o.summary||'';priority.value=o.priority||'';signature.value=o.signature||'';advised.value=o.advised||'';updateCounts()}
 function autoSave(){localStorage.setItem('halesInspectionDraft',JSON.stringify(data()))}function updateCounts(){let c={G:0,Y:0,R:0,U:0};document.querySelectorAll('.item').forEach(d=>{const v=d.querySelector('.active')?.dataset.v;c[v||'U']++});counts.innerHTML=`<span class="pill">🟢 ${c.G} Good</span><span class="pill">🟡 ${c.Y} Monitor</span><span class="pill">🔴 ${c.R} Repair</span><span class="pill">${c.U} Unmarked</span>`}
 document.querySelectorAll('input,select,textarea').forEach(x=>x.addEventListener('change',autoSave));saveBtn.onclick=()=>{autoSave();alert('Inspection saved on this device.')};newBtn.onclick=()=>{if(confirm('Clear this inspection and start a new one?')){localStorage.removeItem('halesInspectionDraft');location.reload()}};reportBtn.onclick=()=>window.print();restore(JSON.parse(localStorage.getItem('halesInspectionDraft')||'null'));updateCounts();if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js');
-// Inspection photo system
-const photoSection=document.createElement('section');
-photoSection.className='card photo-section';
-photoSection.innerHTML=`<h2>INSPECTION PHOTOS</h2>
-<div class="photo-controls">
-  <label>Add Inspection Photos
-    <input id="photoInput" type="file" accept="image/*" multiple>
-  </label>
-</div>
-<div id="photoGallery" class="photo-gallery"></div>`;
-root.appendChild(photoSection);
+// SECTION-SPECIFIC INSPECTION PHOTO SYSTEM
+const PHOTO_MAX_WIDTH = 1200;
+const PHOTO_MAX_HEIGHT = 1200;
+const PHOTO_QUALITY = 0.72;
 
-const photoInput=document.getElementById('photoInput');
-const photoGallery=document.getElementById('photoGallery');
+function compressInspectionPhoto(file, callback) {
+  const reader = new FileReader();
 
-photoInput.addEventListener('change',()=>{
-  Array.from(photoInput.files).forEach(file=>{
-    const reader=new FileReader();
-    reader.onload=e=>{
-      const photo=document.createElement('div');
-      photo.className='inspection-photo';
-      photo.innerHTML=`<img src="${e.target.result}" alt="Inspection photo">
-      <textarea placeholder="Photo notes / condition / location"></textarea>
-      <button type="button" class="secondary remove-photo">Remove Photo</button>`;
-      photo.querySelector('.remove-photo').onclick=()=>photo.remove();
-      photoGallery.appendChild(photo);
+  reader.onload = event => {
+    const img = new Image();
+
+    img.onload = () => {
+      let width = img.width;
+      let height = img.height;
+
+      const scale = Math.min(
+        1,
+        PHOTO_MAX_WIDTH / width,
+        PHOTO_MAX_HEIGHT / height
+      );
+
+      width = Math.round(width * scale);
+      height = Math.round(height * scale);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+
+      const compressedPhoto = canvas.toDataURL(
+        'image/jpeg',
+        PHOTO_QUALITY
+      );
+
+      callback(compressedPhoto);
     };
-    reader.readAsDataURL(file);
+
+    img.src = event.target.result;
+  };
+
+  reader.readAsDataURL(file);
+}
+
+document.querySelectorAll('#sections .card').forEach(section => {
+  const sectionTitle = section.querySelector('h2');
+  if (!sectionTitle) return;
+
+  const photoArea = document.createElement('div');
+  photoArea.className = 'section-photo-area';
+
+  photoArea.innerHTML = `
+    <div class="section-photo-heading">
+      INSPECTION PHOTO — ${sectionTitle.textContent}
+    </div>
+
+    <label class="section-photo-control">
+      Add Inspection Photo
+      <input
+        type="file"
+        accept="image/*"
+        class="section-photo-input"
+        multiple
+      >
+    </label>
+
+    <div class="section-photo-gallery"></div>
+  `;
+
+  section.appendChild(photoArea);
+
+  const input = photoArea.querySelector('.section-photo-input');
+  const gallery = photoArea.querySelector('.section-photo-gallery');
+
+  input.addEventListener('change', () => {
+    Array.from(input.files).forEach(file => {
+      if (!file.type.startsWith('image/')) return;
+
+      compressInspectionPhoto(file, compressedPhoto => {
+        const photo = document.createElement('div');
+        photo.className = 'section-inspection-photo';
+
+        photo.innerHTML = `
+          <img src="${compressedPhoto}" alt="Inspection photo">
+
+          <textarea
+            placeholder="Photo notes / condition / location"
+          ></textarea>
+
+          <button
+            type="button"
+            class="secondary section-remove-photo"
+          >
+            Remove Photo
+          </button>
+        `;
+
+        photo
+          .querySelector('.section-remove-photo')
+          .addEventListener('click', () => {
+            photo.remove();
+          });
+
+        gallery.appendChild(photo);
+      });
+    });
+
+    input.value = '';
   });
-  photoInput.value='';
 });
