@@ -2,3 +2,76 @@
 @page{margin:0;}
 @media print{*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}.status button[data-v=G].active{background:#bfe8d0!important;border-color:#2c7a4b!important;color:#fff!important}.status button[data-v=Y].active{background:#ffe7a0!important;border-color:#9b7410!important;color:#fff!important}.status button[data-v=R].active{background:#f4c4c4!important;border-color:#a22!important;color:#fff!important}}
 @media print{.status button.active{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;opacity:1!important}.status button[data-v=G].active{background-color:#2e9d50!important;background:#2e9d50!important;border:3px solid #187333!important;color:#fff!important}.status button[data-v=Y].active{background-color:#f2b705!important;background:#f2b705!important;border:3px solid #b78300!important;color:#111!important}.status button[data-v=R].active{background-color:#d9363e!important;background:#d9363e!important;border:3px solid #9f1f26!important;color:#fff!important}}
+/* Inspection photo system */
+.photo-section{
+  margin-top:12px;
+}
+.photo-controls{
+  margin-bottom:12px;
+}
+.photo-controls label{
+  display:inline-block;
+  font-weight:700;
+  padding:10px 14px;
+  border:2px solid #111;
+  border-radius:8px;
+  cursor:pointer;
+}
+.photo-controls input{
+  display:block;
+  margin-top:8px;
+}
+.photo-gallery{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:12px;
+}
+.inspection-photo{
+  border:1px solid #ddd;
+  border-radius:10px;
+  padding:10px;
+  break-inside:avoid;
+}
+.inspection-photo img{
+  display:block;
+  width:100%;
+  max-height:350px;
+  object-fit:contain;
+  border-radius:8px;
+  background:#eee;
+}
+.inspection-photo textarea{
+  width:100%;
+  min-height:65px;
+  margin-top:8px;
+}
+.remove-photo{
+  margin-top:8px;
+}
+
+@media(max-width:560px){
+  .photo-gallery{
+    grid-template-columns:1fr;
+  }
+}
+
+@media print{
+  .photo-controls,
+  .remove-photo{
+    display:none!important;
+  }
+
+  .photo-gallery{
+    grid-template-columns:repeat(2,1fr);
+    gap:10px;
+  }
+
+  .inspection-photo{
+    break-inside:avoid;
+    page-break-inside:avoid;
+  }
+
+  .inspection-photo img{
+    max-height:300px;
+  }
+}
