@@ -16,3 +16,34 @@ function data(){const out={vehicle:{},items:{},summary:summary.value,priority:pr
 function restore(o){if(!o)return;Object.entries(o.vehicle||{}).forEach(([k,v])=>{if(document.getElementById(k))document.getElementById(k).value=v});Object.entries(o.items||{}).forEach(([id,v])=>{const d=document.querySelector(`[data-id="${id}"]`);if(d){if(v.status)d.querySelector(`[data-v="${v.status}"]`)?.classList.add('active');d.querySelector('.measurement').value=v.notes||''}});summary.value=o.summary||'';priority.value=o.priority||'';signature.value=o.signature||'';advised.value=o.advised||'';updateCounts()}
 function autoSave(){localStorage.setItem('halesInspectionDraft',JSON.stringify(data()))}function updateCounts(){let c={G:0,Y:0,R:0,U:0};document.querySelectorAll('.item').forEach(d=>{const v=d.querySelector('.active')?.dataset.v;c[v||'U']++});counts.innerHTML=`<span class="pill">🟢 ${c.G} Good</span><span class="pill">🟡 ${c.Y} Monitor</span><span class="pill">🔴 ${c.R} Repair</span><span class="pill">${c.U} Unmarked</span>`}
 document.querySelectorAll('input,select,textarea').forEach(x=>x.addEventListener('change',autoSave));saveBtn.onclick=()=>{autoSave();alert('Inspection saved on this device.')};newBtn.onclick=()=>{if(confirm('Clear this inspection and start a new one?')){localStorage.removeItem('halesInspectionDraft');location.reload()}};reportBtn.onclick=()=>window.print();restore(JSON.parse(localStorage.getItem('halesInspectionDraft')||'null'));updateCounts();if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js');
+// Inspection photo system
+const photoSection=document.createElement('section');
+photoSection.className='card photo-section';
+photoSection.innerHTML=`<h2>INSPECTION PHOTOS</h2>
+<div class="photo-controls">
+  <label>Add Inspection Photos
+    <input id="photoInput" type="file" accept="image/*" multiple>
+  </label>
+</div>
+<div id="photoGallery" class="photo-gallery"></div>`;
+root.appendChild(photoSection);
+
+const photoInput=document.getElementById('photoInput');
+const photoGallery=document.getElementById('photoGallery');
+
+photoInput.addEventListener('change',()=>{
+  Array.from(photoInput.files).forEach(file=>{
+    const reader=new FileReader();
+    reader.onload=e=>{
+      const photo=document.createElement('div');
+      photo.className='inspection-photo';
+      photo.innerHTML=`<img src="${e.target.result}" alt="Inspection photo">
+      <textarea placeholder="Photo notes / condition / location"></textarea>
+      <button type="button" class="secondary remove-photo">Remove Photo</button>`;
+      photo.querySelector('.remove-photo').onclick=()=>photo.remove();
+      photoGallery.appendChild(photo);
+    };
+    reader.readAsDataURL(file);
+  });
+  photoInput.value='';
+});
