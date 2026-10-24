@@ -175,19 +175,19 @@ h3 {
   border-color: #555555;
 }
 
-.status-controls button[data-status="green"].active {
+.status-controls button[data-status="green"].selected {
   background: #238636;
   border-color: #238636;
   color: #ffffff;
 }
 
-.status-controls button[data-status="yellow"].active {
+.status-controls button[data-status="yellow"].selected {
   background: #d9a400;
   border-color: #d9a400;
   color: #111111;
 }
 
-.status-controls button[data-status="red"].active {
+.status-controls button[data-status="red"].selected {
   background: #cf222e;
   border-color: #cf222e;
   color: #ffffff;
