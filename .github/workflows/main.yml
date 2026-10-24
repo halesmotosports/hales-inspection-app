@@ -1,0 +1,39 @@
+name: Deploy V2 Preview
+
+on:
+  push:
+    branches:
+      - v2-development
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "v2-preview"
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout v2-development
+        uses: actions/checkout@v4
+        with:
+          ref: v2-development
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload V2 site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: "."
+
+      - name: Deploy V2
+        uses: actions/deploy-pages@v4
