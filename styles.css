@@ -79,7 +79,7 @@ textarea {
 
 .vehicle-information,
 .inspection-section,
-.technician-summary,
+.technician-completion,
 .inspection-summary,
 .inspection-disclaimer {
   background: #ffffff;
@@ -96,13 +96,13 @@ h3 {
 
 /* VEHICLE INFORMATION */
 
-.vehicle-fields {
+.information-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
 }
 
-.vehicle-fields label {
+.information-grid label {
   display: flex;
   flex-direction: column;
   gap: 5px;
@@ -110,8 +110,8 @@ h3 {
   font-weight: 700;
 }
 
-.vehicle-fields input,
-.vehicle-fields select {
+.information-grid input,
+.information-grid select {
   width: 100%;
   min-height: 40px;
   padding: 8px 10px;
@@ -127,7 +127,7 @@ h3 {
   overflow: hidden;
 }
 
-.inspection-section h3 {
+.inspection-section-title {
   margin: 0;
   padding: 14px 18px;
   background: #202020;
@@ -149,7 +149,7 @@ h3 {
   border-top: 0;
 }
 
-.item-name {
+.inspection-item-label {
   font-weight: 650;
   line-height: 1.3;
 }
@@ -208,7 +208,7 @@ h3 {
 
 /* TECHNICIAN SUMMARY */
 
-.technician-summary textarea {
+.technician-completion textarea {
   width: 100%;
   min-height: 100px;
   resize: vertical;
@@ -217,15 +217,15 @@ h3 {
   border-radius: 6px;
 }
 
-.technician-summary label {
+.technician-completion label {
   display: block;
   margin-top: 14px;
   font-size: 12px;
   font-weight: 700;
 }
 
-.technician-summary input,
-.technician-summary select {
+.technician-completion input,
+.technician-completion select {
   width: 100%;
   min-height: 40px;
   margin-top: 5px;
@@ -236,25 +236,25 @@ h3 {
 
 /* INSPECTION SUMMARY */
 
-.inspection-summary {
+.inspection-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 12px;
 }
 
-.summary-count {
+.summary-card {
   text-align: center;
   padding: 14px 10px;
   border: 1px solid #d5d5d5;
   border-radius: 8px;
 }
 
-.summary-count strong {
+.summary-card strong {
   display: block;
   font-size: 26px;
 }
 
-.summary-count span {
+.summary-card span {
   display: block;
   margin-top: 4px;
   font-size: 12px;
@@ -269,9 +269,9 @@ button {
 
 .primary-button,
 .secondary-button,
-#saveBtn,
-#newInspectionBtn,
-#generateReportBtn {
+#saveInspectionButton,
+#newInspectionButton,
+#generateReportButton {
   min-height: 42px;
   padding: 10px 16px;
   border-radius: 7px;
@@ -281,14 +281,14 @@ button {
 }
 
 .primary-button,
-#saveBtn,
-#generateReportBtn {
+#saveInspectionButton,
+#generateReportButton {
   background: #111111;
   color: #ffffff;
 }
 
 .secondary-button,
-#newInspectionBtn {
+#newInspectionButton {
   background: #ffffff;
   color: #111111;
 }
@@ -307,7 +307,7 @@ button {
 /* TABLET */
 
 @media (max-width: 900px) {
-  .vehicle-fields {
+  .information-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -318,7 +318,8 @@ button {
   .inspection-item input,
   .measurement,
   .measurement-notes,
-  .item-notes {
+  .item-notes
+   .inspection-item-notes {
     grid-column: 1 / -1;
   }
 }
@@ -340,7 +341,7 @@ button {
     margin-top: 10px;
   }
 
-  .vehicle-fields {
+  .information-grid {
     grid-template-columns: 1fr;
   }
 
@@ -357,7 +358,7 @@ button {
     height: 42px;
   }
 
-  .inspection-summary {
+  .summary-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 }
@@ -376,7 +377,7 @@ button {
 
   .inspection-section,
   .vehicle-information,
-  .technician-summary,
+  .technician-completion,
   .inspection-summary,
   .inspection-disclaimer {
     break-inside: avoid;
