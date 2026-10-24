@@ -1,1 +1,238 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#111111"><title>Hale's Motorsports Inspection</title><link rel="manifest" href="manifest.json"><link rel="stylesheet" href="styles.css"></head><body><header><h1>HALE'S MOTORSPORTS</h1><div>TACOMA SPECIALISTS | TECHNICIAN VEHICLE INSPECTION</div></header><main><section class="card"><h2>Vehicle / Customer</h2><div class="grid" id="vehicleFields"></div><div class="actions"><button id="saveBtn">Save</button><button id="newBtn" class="secondary">New Inspection</button></div></section><div id="sections"></div><section class="card"><h2>TECHNICIAN SUMMARY / RECOMMENDATIONS</h2><textarea id="summary" rows="5" placeholder="Summary / recommendations"></textarea><label>Priority repairs<textarea id="priority" rows="3"></textarea></label><div class="grid"><label>Technician signature<input id="signature"></label><label>Customer advised<select id="advised"><option value="">Select</option><option>Yes</option><option>No</option></select></label></div></section><section class="card"><h2>Inspection Summary</h2><div id="counts" class="counts"></div><button id="reportBtn">Generate / Print Customer Report</button></section><p class="disclaimer">Inspection reflects visible/measurable condition at time of service. Disassembly or diagnostic testing is not included unless specifically authorized. Green = acceptable; Yellow = monitor/service soon; Red = repair/replace recommended. Measurements and technician notes govern when provided.</p></main><script src="app.js"></script></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#111111">
+
+  <title>Hale's Motorsports Technician Inspection</title>
+
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+
+  <header class="app-header">
+    <div class="brand">
+      <h1>HALE'S MOTORSPORTS</h1>
+      <p>TACOMA SPECIALISTS</p>
+    </div>
+
+    <div class="app-title">
+      <h2>Technician Vehicle Inspection</h2>
+      <span class="version">V2</span>
+    </div>
+  </header>
+
+  <main class="app-container">
+
+    <section class="inspection-controls">
+      <div class="inspection-number">
+        <span>Inspection:</span>
+        <strong id="inspectionNumber">New Inspection</strong>
+      </div>
+
+      <div class="control-buttons">
+        <button type="button" id="savedInspectionsButton">
+          Saved Inspections
+        </button>
+
+        <button type="button" id="saveInspectionButton">
+          Save Inspection
+        </button>
+
+        <button type="button" id="newInspectionButton">
+          New Inspection
+        </button>
+      </div>
+
+      <div id="saveStatus" class="save-status">
+        Ready
+      </div>
+    </section>
+
+
+    <section class="vehicle-information">
+
+      <h2>Customer &amp; Vehicle Information</h2>
+
+      <div class="information-grid">
+
+        <label>
+          Customer
+          <input type="text" id="customerName">
+        </label>
+
+        <label>
+          Phone
+          <input type="tel" id="customerPhone">
+        </label>
+
+        <label>
+          Date
+          <input type="date" id="inspectionDate">
+        </label>
+
+        <label>
+          RO / Invoice
+          <input type="text" id="repairOrder">
+        </label>
+
+        <label>
+          Technician
+          <input type="text" id="technician">
+        </label>
+
+        <label>
+          Year
+          <input type="text" id="vehicleYear">
+        </label>
+
+        <label>
+          Make
+          <input type="text" id="vehicleMake">
+        </label>
+
+        <label>
+          Model
+          <input type="text" id="vehicleModel">
+        </label>
+
+        <label>
+          Mileage
+          <input type="number" id="vehicleMileage">
+        </label>
+
+        <label>
+          VIN
+          <input type="text" id="vehicleVin">
+        </label>
+
+        <label>
+          License Plate
+          <input type="text" id="licensePlate">
+        </label>
+
+        <label>
+          State Registered
+          <input type="text" id="registrationState">
+        </label>
+
+      </div>
+
+    </section>
+
+
+    <section class="inspection-summary">
+
+      <h2>Inspection Summary</h2>
+
+      <div class="summary-grid">
+
+        <div class="summary-card good">
+          <strong id="goodCount">0</strong>
+          <span>Good</span>
+        </div>
+
+        <div class="summary-card monitor">
+          <strong id="monitorCount">0</strong>
+          <span>Monitor</span>
+        </div>
+
+        <div class="summary-card repair">
+          <strong id="repairCount">0</strong>
+          <span>Repair</span>
+        </div>
+
+        <div class="summary-card unmarked">
+          <strong id="unmarkedCount">0</strong>
+          <span>Unmarked</span>
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <div id="inspectionSections"></div>
+
+
+    <section class="technician-completion">
+
+      <h2>Technician Summary &amp; Recommendations</h2>
+
+      <label>
+        Technician Summary / Recommendations
+        <textarea id="technicianSummary" rows="6"></textarea>
+      </label>
+
+      <label>
+        Priority Repairs
+        <textarea id="priorityRepairs" rows="5"></textarea>
+      </label>
+
+      <div class="completion-grid">
+
+        <label>
+          Technician Signature
+          <input type="text" id="technicianSignature">
+        </label>
+
+        <label>
+          Customer Advised
+          <select id="customerAdvised">
+            <option value="">Select</option>
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </label>
+
+      </div>
+
+    </section>
+
+
+    <section class="report-controls">
+
+      <button type="button" id="generateReportButton">
+        Generate Customer Report
+      </button>
+
+      <button type="button" id="finalizeInspectionButton">
+        Finalize Inspection
+      </button>
+
+    </section>
+
+
+    <section class="inspection-disclaimer">
+
+      <h3>Inspection Information</h3>
+
+      <p>
+        This inspection documents visible and measurable vehicle condition at
+        the time of inspection. Disassembly, internal inspection, and diagnostic
+        testing are not included unless specifically authorized.
+      </p>
+
+      <p>
+        <strong>Green:</strong> Acceptable condition.
+        <strong>Yellow:</strong> Monitor or service soon.
+        <strong>Red:</strong> Repair or replacement recommended.
+        Measurements and technician notes govern when provided.
+      </p>
+
+    </section>
+
+  </main>
+
+
+  <div id="mediaViewer" class="media-viewer" hidden></div>
+
+  <div id="savedInspectionsPanel" class="saved-inspections-panel" hidden></div>
+
+
+  <script src="app.js"></script>
+
+</body>
+</html>
