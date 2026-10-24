@@ -158,11 +158,11 @@ h3 {
 
 .status-controls {
   display: flex;
-  gap: 7px;
+  gap: 10px;
 }
 
 .status-controls button {
-  width: 44px;
+  width: 52px;
   height: 38px;
   border: 2px solid #b8b8b8;
   border-radius: 7px;
