@@ -174,6 +174,8 @@ const inspectionState = {
   version: 2,
   inspectionNumber: null,
   status: "draft",
+  createdAt: null,
+  updatedAt: null,
   vehicle: {},
   items: {},
   technicianSummary: "",
@@ -182,6 +184,13 @@ const inspectionState = {
   customerAdvised: "",
   media: {}
 };
+
+const STORAGE_KEYS = {
+  active: "hales-v2-active-inspection",
+  saved: "hales-v2-saved-inspections"
+};
+
+let autosaveTimer = null;
 
 
 // ============================================================
@@ -257,8 +266,8 @@ function setItemStatus(itemId, newStatus) {
   }
 
   refreshStatusButtons(itemId);
-  updateSummaryCounts();
-}
+updateSummaryCounts();
+scheduleAutosave();}
 
 
 function refreshStatusButtons(itemId) {
@@ -449,9 +458,10 @@ function buildInspectionItem(
   notes.addEventListener(
     "input",
     () => {
-      inspectionState.items[itemId].notes =
-        notes.value;
-    }
+  inspectionState.items[itemId].notes =
+  notes.value;
+
+scheduleAutosave();    }
   );
 
 
@@ -659,59 +669,884 @@ function setDefaultDate() {
 
 
 // ============================================================
-// BUTTON PLACEHOLDERS
+// V2 STAGE 2 — LOCAL PERSISTENCE
 // ============================================================
 
-function configureStageOneButtons() {
+const vehicleFieldIds = [
+  "customerName",
+  "customerPhone",
+  "inspectionDate",
+  "repairOrder",
+  "technician",
+  "vehicleYear",
+  "vehicleMake",
+  "vehicleModel",
+  "vehicleMileage",
+  "vehicleVin",
+  "licensePlate",
+  "registrationState"
+];
 
-  const futureButtons = [
-    "savedInspectionsButton",
-    "saveInspectionButton",
-    "generateReportButton",
-    "finalizeInspectionButton"
-  ];
+const completionFieldIds = [
+  "technicianSummary",
+  "priorityRepairs",
+  "technicianSignature",
+  "customerAdvised"
+];
 
-  futureButtons.forEach((buttonId) => {
+function setSaveStatus(message) {
+  const saveStatus =
+    document.getElementById("saveStatus");
 
-    const button =
-      document.getElementById(buttonId);
+  if (saveStatus) {
+    saveStatus.textContent = message;
+  }
+}
 
-    if (button) {
-      button.disabled = true;
+function readStorage(key, fallback) {
+  try {
+    const stored = localStorage.getItem(key);
+
+    if (!stored) {
+      return fallback;
+    }
+
+    return JSON.parse(stored);
+  } catch (error) {
+    console.error(
+      "Unable to read Hale's inspection storage:",
+      error
+    );
+
+    return fallback;
+  }
+}
+
+function writeStorage(key, value) {
+  try {
+    localStorage.setItem(
+      key,
+      JSON.stringify(value)
+    );
+
+    return true;
+  } catch (error) {
+    console.error(
+      "Unable to save Hale's inspection:",
+      error
+    );
+
+    setSaveStatus("Save failed");
+
+    return false;
+  }
+}
+
+function cloneInspectionState() {
+  return JSON.parse(
+    JSON.stringify(inspectionState)
+  );
+}
+
+function generateInspectionNumber() {
+  const now = new Date();
+
+  const year = now.getFullYear();
+
+  const month =
+    String(
+      now.getMonth() + 1
+    ).padStart(2, "0");
+
+  const day =
+    String(
+      now.getDate()
+    ).padStart(2, "0");
+
+  const time =
+    String(
+      now.getTime()
+    ).slice(-6);
+
+  return (
+    `HM-${year}${month}${day}-${time}`
+  );
+}
+
+function collectFormState() {
+
+  vehicleFieldIds.forEach((fieldId) => {
+
+    const field =
+      document.getElementById(fieldId);
+
+    if (field) {
+      inspectionState.vehicle[fieldId] =
+        field.value;
     }
 
   });
 
+  completionFieldIds.forEach((fieldId) => {
 
-  const newInspectionButton =
+    const field =
+      document.getElementById(fieldId);
+
+    if (field) {
+      inspectionState[fieldId] =
+        field.value;
+    }
+
+  });
+}
+
+function applyStateToForm() {
+
+  vehicleFieldIds.forEach((fieldId) => {
+
+    const field =
+      document.getElementById(fieldId);
+
+    if (field) {
+      field.value =
+        inspectionState.vehicle[fieldId] ||
+        "";
+    }
+
+  });
+
+  completionFieldIds.forEach((fieldId) => {
+
+    const field =
+      document.getElementById(fieldId);
+
+    if (field) {
+      field.value =
+        inspectionState[fieldId] || "";
+    }
+
+  });
+
+  Object.entries(
+    inspectionState.items
+  ).forEach(([itemId, itemState]) => {
+
+    const row =
+      document.querySelector(
+        `[data-item-id="${itemId}"]`
+      );
+
+    if (!row) {
+      return;
+    }
+
+    const notes =
+      row.querySelector(
+        ".inspection-item-notes"
+      );
+
+    if (notes) {
+      notes.value =
+        itemState.notes || "";
+    }
+
+    refreshStatusButtons(itemId);
+  });
+
+  const inspectionNumber =
+    document.getElementById(
+      "inspectionNumber"
+    );
+
+  if (inspectionNumber) {
+    inspectionNumber.textContent =
+      inspectionState.inspectionNumber ||
+      "New Inspection";
+  }
+
+  updateSummaryCounts();
+}
+
+function loadInspectionState(savedState) {
+
+  if (
+    !savedState ||
+    typeof savedState !== "object"
+  ) {
+    return;
+  }
+
+  inspectionState.inspectionNumber =
+    savedState.inspectionNumber || null;
+
+  inspectionState.status =
+    savedState.status || "draft";
+
+  inspectionState.createdAt =
+    savedState.createdAt || null;
+
+  inspectionState.updatedAt =
+    savedState.updatedAt || null;
+
+  inspectionState.vehicle =
+    savedState.vehicle || {};
+
+  inspectionState.technicianSummary =
+    savedState.technicianSummary || "";
+
+  inspectionState.priorityRepairs =
+    savedState.priorityRepairs || "";
+
+  inspectionState.technicianSignature =
+    savedState.technicianSignature || "";
+
+  inspectionState.customerAdvised =
+    savedState.customerAdvised || "";
+
+  inspectionState.media =
+    savedState.media || {};
+
+  Object.keys(
+    inspectionState.items
+  ).forEach((itemId) => {
+
+    const savedItem =
+      savedState.items &&
+      savedState.items[itemId];
+
+    if (savedItem) {
+
+      inspectionState.items[itemId].status =
+        savedItem.status || "";
+
+      inspectionState.items[itemId].notes =
+        savedItem.notes || "";
+
+    } else {
+
+      inspectionState.items[itemId].status =
+        "";
+
+      inspectionState.items[itemId].notes =
+        "";
+    }
+
+  });
+}
+
+function autosaveInspection() {
+
+  collectFormState();
+
+  inspectionState.updatedAt =
+    new Date().toISOString();
+
+  const saved =
+    writeStorage(
+      STORAGE_KEYS.active,
+      cloneInspectionState()
+    );
+
+  if (saved) {
+    setSaveStatus("Autosaved");
+  }
+}
+
+function scheduleAutosave() {
+
+  clearTimeout(autosaveTimer);
+
+  setSaveStatus("Unsaved changes");
+
+  autosaveTimer =
+    setTimeout(
+      autosaveInspection,
+      400
+    );
+}
+
+function saveInspection() {
+
+  collectFormState();
+
+  const now =
+    new Date().toISOString();
+
+  if (!inspectionState.inspectionNumber) {
+
+    inspectionState.inspectionNumber =
+      generateInspectionNumber();
+
+    inspectionState.createdAt = now;
+  }
+
+  inspectionState.updatedAt = now;
+
+  const savedInspections =
+    readStorage(
+      STORAGE_KEYS.saved,
+      []
+    );
+
+  const snapshot =
+    cloneInspectionState();
+
+  const existingIndex =
+    savedInspections.findIndex(
+      (inspection) =>
+        inspection.inspectionNumber ===
+        snapshot.inspectionNumber
+    );
+
+  if (existingIndex >= 0) {
+
+    savedInspections[existingIndex] =
+      snapshot;
+
+  } else {
+
+    savedInspections.unshift(snapshot);
+  }
+
+  const saved =
+    writeStorage(
+      STORAGE_KEYS.saved,
+      savedInspections
+    );
+
+  if (!saved) {
+    return;
+  }
+
+  writeStorage(
+    STORAGE_KEYS.active,
+    snapshot
+  );
+
+  applyStateToForm();
+
+  setSaveStatus("Inspection saved");
+}
+
+function resetInspectionState() {
+
+  inspectionState.inspectionNumber = null;
+  inspectionState.status = "draft";
+  inspectionState.createdAt = null;
+  inspectionState.updatedAt = null;
+
+  inspectionState.vehicle = {};
+
+  inspectionState.technicianSummary = "";
+  inspectionState.priorityRepairs = "";
+  inspectionState.technicianSignature = "";
+  inspectionState.customerAdvised = "";
+
+  inspectionState.media = {};
+
+  Object.values(
+    inspectionState.items
+  ).forEach((itemState) => {
+
+    itemState.status = "";
+    itemState.notes = "";
+
+  });
+}
+
+function startNewInspection() {
+
+  const confirmed =
+    window.confirm(
+      "Start a new inspection? Unsaved work in the current inspection will be cleared."
+    );
+
+  if (!confirmed) {
+    return;
+  }
+
+  localStorage.removeItem(
+    STORAGE_KEYS.active
+  );
+
+  resetInspectionState();
+
+  applyStateToForm();
+
+  const dateInput =
+    document.getElementById(
+      "inspectionDate"
+    );
+
+  if (dateInput) {
+    dateInput.value = "";
+  }
+
+  setDefaultDate();
+
+  collectFormState();
+
+  writeStorage(
+    STORAGE_KEYS.active,
+    cloneInspectionState()
+  );
+
+  setSaveStatus("New inspection");
+
+  window.scrollTo({
+    top: 0,
+    behavior: "smooth"
+  });
+}
+
+function restoreActiveInspection() {
+
+  const savedState =
+    readStorage(
+      STORAGE_KEYS.active,
+      null
+    );
+
+  if (!savedState) {
+    return false;
+  }
+
+  loadInspectionState(savedState);
+
+  applyStateToForm();
+
+  setSaveStatus("Draft restored");
+
+  return true;
+}
+
+function closeSavedInspections() {
+
+  const panel =
+    document.getElementById(
+      "savedInspectionsPanel"
+    );
+
+  if (panel) {
+    panel.hidden = true;
+    panel.innerHTML = "";
+  }
+}
+
+function openSavedInspection(
+  inspectionNumber
+) {
+
+  const savedInspections =
+    readStorage(
+      STORAGE_KEYS.saved,
+      []
+    );
+
+  const savedInspection =
+    savedInspections.find(
+      (inspection) =>
+        inspection.inspectionNumber ===
+        inspectionNumber
+    );
+
+  if (!savedInspection) {
+
+    setSaveStatus(
+      "Saved inspection not found"
+    );
+
+    return;
+  }
+
+  loadInspectionState(
+    savedInspection
+  );
+
+  applyStateToForm();
+
+  writeStorage(
+    STORAGE_KEYS.active,
+    cloneInspectionState()
+  );
+
+  closeSavedInspections();
+
+  setSaveStatus(
+    "Saved inspection opened"
+  );
+
+  window.scrollTo({
+    top: 0,
+    behavior: "smooth"
+  });
+}
+
+function deleteSavedInspection(
+  inspectionNumber
+) {
+
+  const confirmed =
+    window.confirm(
+      `Delete inspection ${inspectionNumber}? This cannot be undone.`
+    );
+
+  if (!confirmed) {
+    return;
+  }
+
+  const savedInspections =
+    readStorage(
+      STORAGE_KEYS.saved,
+      []
+    );
+
+  const remainingInspections =
+    savedInspections.filter(
+      (inspection) =>
+        inspection.inspectionNumber !==
+        inspectionNumber
+    );
+
+  writeStorage(
+    STORAGE_KEYS.saved,
+    remainingInspections
+  );
+
+  showSavedInspections();
+}
+
+function getSavedInspectionDescription(
+  inspection
+) {
+
+  const vehicle =
+    inspection.vehicle || {};
+
+  const customer =
+    vehicle.customerName ||
+    "No customer";
+
+  const vehicleDescription = [
+    vehicle.vehicleYear,
+    vehicle.vehicleMake,
+    vehicle.vehicleModel
+  ]
+    .filter(Boolean)
+    .join(" ") ||
+    "Vehicle not entered";
+
+  const date =
+    vehicle.inspectionDate || "";
+
+  const repairOrder =
+    vehicle.repairOrder || "";
+
+  let description =
+    `${customer} — ${vehicleDescription}`;
+
+  if (date) {
+    description += ` — ${date}`;
+  }
+
+  if (repairOrder) {
+    description +=
+      ` — RO ${repairOrder}`;
+  }
+
+  return description;
+}
+
+function showSavedInspections() {
+
+  const panel =
+    document.getElementById(
+      "savedInspectionsPanel"
+    );
+
+  if (!panel) {
+    return;
+  }
+
+  const savedInspections =
+    readStorage(
+      STORAGE_KEYS.saved,
+      []
+    );
+
+  panel.innerHTML = "";
+  panel.hidden = false;
+
+  panel.style.position = "fixed";
+  panel.style.inset = "0";
+  panel.style.zIndex = "9999";
+  panel.style.overflow = "auto";
+  panel.style.background =
+    "rgba(0, 0, 0, 0.72)";
+  panel.style.padding = "24px";
+
+  const content =
+    createElement(
+      "div",
+      "saved-inspections-content"
+    );
+
+  content.style.maxWidth = "900px";
+  content.style.margin = "30px auto";
+  content.style.background = "#ffffff";
+  content.style.borderRadius = "10px";
+  content.style.padding = "24px";
+
+  const heading =
+    createElement(
+      "h2",
+      "",
+      "Saved Inspections"
+    );
+
+  const closeButton =
+    createElement(
+      "button",
+      "",
+      "Close"
+    );
+
+  closeButton.type = "button";
+  closeButton.style.marginBottom = "18px";
+
+  closeButton.addEventListener(
+    "click",
+    closeSavedInspections
+  );
+
+  content.appendChild(heading);
+  content.appendChild(closeButton);
+
+  if (!savedInspections.length) {
+
+    content.appendChild(
+      createElement(
+        "p",
+        "",
+        "No saved inspections yet."
+      )
+    );
+
+  } else {
+
+    savedInspections.forEach(
+      (inspection) => {
+
+        const row =
+          createElement(
+            "div",
+            "saved-inspection-row"
+          );
+
+        row.style.display = "grid";
+        row.style.gridTemplateColumns =
+          "1fr auto auto";
+        row.style.gap = "10px";
+        row.style.alignItems = "center";
+        row.style.borderTop =
+          "1px solid #dddddd";
+        row.style.padding = "14px 0";
+
+        const info =
+          createElement(
+            "div",
+            "saved-inspection-info"
+          );
+
+        const number =
+          createElement(
+            "strong",
+            "",
+            inspection.inspectionNumber
+          );
+
+        const description =
+          createElement(
+            "div",
+            "",
+            getSavedInspectionDescription(
+              inspection
+            )
+          );
+
+        info.appendChild(number);
+        info.appendChild(description);
+
+        const openButton =
+          createElement(
+            "button",
+            "",
+            "Open"
+          );
+
+        openButton.type = "button";
+
+        openButton.addEventListener(
+          "click",
+          () => {
+            openSavedInspection(
+              inspection.inspectionNumber
+            );
+          }
+        );
+
+        const deleteButton =
+          createElement(
+            "button",
+            "",
+            "Delete"
+          );
+
+        deleteButton.type = "button";
+
+        deleteButton.addEventListener(
+          "click",
+          () => {
+            deleteSavedInspection(
+              inspection.inspectionNumber
+            );
+          }
+        );
+
+        row.appendChild(info);
+        row.appendChild(openButton);
+        row.appendChild(deleteButton);
+
+        content.appendChild(row);
+      }
+    );
+  }
+
+  panel.appendChild(content);
+}
+
+function configurePersistence() {
+
+  vehicleFieldIds.forEach(
+    (fieldId) => {
+
+      const field =
+        document.getElementById(
+          fieldId
+        );
+
+      if (!field) {
+        return;
+      }
+
+      field.addEventListener(
+        "input",
+        scheduleAutosave
+      );
+
+      field.addEventListener(
+        "change",
+        scheduleAutosave
+      );
+    }
+  );
+
+  completionFieldIds.forEach(
+    (fieldId) => {
+
+      const field =
+        document.getElementById(
+          fieldId
+        );
+
+      if (!field) {
+        return;
+      }
+
+      field.addEventListener(
+        "input",
+        scheduleAutosave
+      );
+
+      field.addEventListener(
+        "change",
+        scheduleAutosave
+      );
+    }
+  );
+
+  const saveButton =
+    document.getElementById(
+      "saveInspectionButton"
+    );
+
+  const savedButton =
+    document.getElementById(
+      "savedInspectionsButton"
+    );
+
+  const newButton =
     document.getElementById(
       "newInspectionButton"
     );
 
-  if (newInspectionButton) {
-
-    newInspectionButton.addEventListener(
-      "click",
-      () => {
-
-        const confirmed =
-          window.confirm(
-            "Clear this inspection and start a new inspection?"
-          );
-
-        if (confirmed) {
-          window.location.reload();
-        }
-
-      }
+  const reportButton =
+    document.getElementById(
+      "generateReportButton"
     );
 
+  const finalizeButton =
+    document.getElementById(
+      "finalizeInspectionButton"
+    );
+
+  if (saveButton) {
+
+    saveButton.disabled = false;
+
+    saveButton.addEventListener(
+      "click",
+      saveInspection
+    );
+  }
+
+  if (savedButton) {
+
+    savedButton.disabled = false;
+
+    savedButton.addEventListener(
+      "click",
+      showSavedInspections
+    );
+  }
+
+  if (newButton) {
+
+    newButton.disabled = false;
+
+    newButton.addEventListener(
+      "click",
+      startNewInspection
+    );
+  }
+
+  /*
+    Report and Finalize remain disabled
+    until their dedicated build stage.
+  */
+
+  if (reportButton) {
+    reportButton.disabled = true;
+  }
+
+  if (finalizeButton) {
+    finalizeButton.disabled = true;
   }
 }
 
 
 // ============================================================
-// INITIALIZE V2
+// INITIALIZE V2 STAGE 2
 // ============================================================
 
 function initializeApp() {
@@ -720,18 +1555,21 @@ function initializeApp() {
 
   setDefaultDate();
 
-  configureStageOneButtons();
+  configurePersistence();
 
-  const saveStatus =
-    document.getElementById(
-      "saveStatus"
+  if (!restoreActiveInspection()) {
+
+    collectFormState();
+
+    writeStorage(
+      STORAGE_KEYS.active,
+      cloneInspectionState()
     );
 
-  if (saveStatus) {
-    saveStatus.textContent =
-      "V2 Stage 1 — Ready";
+    setSaveStatus(
+      "V2 Stage 2 — Ready"
+    );
   }
-
 }
 
 
