@@ -1582,4 +1582,99 @@ function initializeApp() {
 }
 
 
-initializeApp();
+// ============================================================
+// SUPABASE AUTHENTICATION
+// ============================================================
+
+let inspectionAppInitialized = false;
+
+function showLoginScreen() {
+  const loginScreen = document.getElementById("loginScreen");
+  const inspectionApp = document.getElementById("inspectionApp");
+
+  if (loginScreen) {
+    loginScreen.hidden = false;
+  }
+
+  if (inspectionApp) {
+    inspectionApp.hidden = true;
+  }
+}
+
+function showInspectionApp() {
+  const loginScreen = document.getElementById("loginScreen");
+  const inspectionApp = document.getElementById("inspectionApp");
+
+  if (loginScreen) {
+    loginScreen.hidden = true;
+  }
+
+  if (inspectionApp) {
+    inspectionApp.hidden = false;
+  }
+
+  if (!inspectionAppInitialized) {
+    initializeApp();
+    inspectionAppInitialized = true;
+  }
+}
+
+async function handleLogin(event) {
+  event.preventDefault();
+
+  const emailInput = document.getElementById("loginEmail");
+  const passwordInput = document.getElementById("loginPassword");
+  const loginStatus = document.getElementById("loginStatus");
+  const loginButton = document.getElementById("loginButton");
+
+  const email = emailInput.value.trim();
+  const password = passwordInput.value;
+
+  loginStatus.textContent = "Signing in...";
+  loginButton.disabled = true;
+
+  const { error } = await supabaseClient.auth.signInWithPassword({
+    email,
+    password
+  });
+
+  if (error) {
+    loginStatus.textContent = error.message;
+    loginButton.disabled = false;
+    return;
+  }
+
+  passwordInput.value = "";
+  loginStatus.textContent = "";
+  loginButton.disabled = false;
+
+  showInspectionApp();
+}
+
+async function initializeAuthentication() {
+  const loginForm = document.getElementById("loginForm");
+
+  if (loginForm) {
+    loginForm.addEventListener("submit", handleLogin);
+  }
+
+  const {
+    data: { session }
+  } = await supabaseClient.auth.getSession();
+
+  if (session) {
+    showInspectionApp();
+  } else {
+    showLoginScreen();
+  }
+
+  supabaseClient.auth.onAuthStateChange((_event, session) => {
+    if (session) {
+      showInspectionApp();
+    } else {
+      showLoginScreen();
+    }
+  });
+}
+
+initializeAuthentication();
