@@ -1353,6 +1353,168 @@ function openSavedInspection(
   });
 }
 
+async function openCloudInspection(
+  inspectionNumber
+) {
+  setSaveStatus("Opening inspection...");
+
+  const {
+    data: { user },
+    error: userError
+  } = await supabaseClient.auth.getUser();
+
+  if (userError || !user) {
+    setSaveStatus(
+      "Unable to open – not signed in"
+    );
+    return;
+  }
+
+  const {
+    data: inspection,
+    error: inspectionError
+  } = await supabaseClient
+    .from("inspections")
+    .select("*")
+    .eq(
+      "inspection_number",
+      inspectionNumber
+    )
+    .eq("owner_id", user.id)
+    .single();
+
+  if (inspectionError || !inspection) {
+    console.error(
+      "Cloud inspection load failed:",
+      inspectionError
+    );
+
+    setSaveStatus(
+      "Unable to load cloud inspection"
+    );
+    return;
+  }
+
+  const {
+    data: results,
+    error: resultsError
+  } = await supabaseClient
+    .from("inspection_results")
+    .select("*")
+    .eq("inspection_id", inspection.id)
+    .eq("owner_id", user.id)
+    .order("display_order", {
+      ascending: true
+    });
+
+  if (resultsError) {
+    console.error(
+      "Cloud inspection results load failed:",
+      resultsError
+    );
+
+    setSaveStatus(
+      "Unable to load inspection results"
+    );
+    return;
+  }
+
+  const cloudState = {
+    inspectionNumber:
+      inspection.inspection_number,
+
+    status:
+      inspection.status || "draft",
+
+    vehicle: {
+      customerName:
+        inspection.customer_name || "",
+
+      customerPhone:
+        inspection.customer_phone || "",
+
+      inspectionDate:
+        inspection.inspection_date || "",
+
+      repairOrder:
+        inspection.repair_order || "",
+
+      technician:
+        inspection.technician || "",
+
+      vehicleYear:
+        inspection.vehicle_year ?? "",
+
+      vehicleMake:
+        inspection.vehicle_make || "",
+
+      vehicleModel:
+        inspection.vehicle_model || "",
+
+      vehicleMileage:
+        inspection.vehicle_mileage ?? "",
+
+      vehicleVin:
+        inspection.vehicle_vin || "",
+
+      licensePlate:
+        inspection.license_plate || "",
+
+      registrationState:
+        inspection.registration_state || ""
+    },
+
+    items: {},
+
+    technicianSummary:
+      inspection.technician_summary || "",
+
+    priorityRepairs:
+      inspection.priority_repairs || "",
+
+    technicianSignature:
+      inspection.technician_signature || "",
+
+    customerAdvised:
+      Boolean(inspection.customer_advised),
+
+    createdAt:
+      inspection.created_at || null,
+
+    updatedAt:
+      inspection.updated_at || null
+  };
+
+  (results || []).forEach((result) => {
+    cloudState.items[result.item_key] = {
+      status:
+        result.status || "unmarked",
+
+      notes:
+        result.measurement_notes || ""
+    };
+  });
+
+  loadInspectionState(cloudState);
+
+  applyStateToForm();
+
+  writeStorage(
+    STORAGE_KEYS.active,
+    cloneInspectionState()
+  );
+
+  closeSavedInspections();
+
+  setSaveStatus(
+    "Cloud inspection opened"
+  );
+
+  window.scrollTo({
+    top: 0,
+    behavior: "smooth"
+  });
+}
 function deleteSavedInspection(
   inspectionNumber
 ) {
