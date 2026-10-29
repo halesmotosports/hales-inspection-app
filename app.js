@@ -1100,10 +1100,102 @@ async function saveInspection() {
     return;
   }
 
+  const {
+  data: savedInspection,
+  error: inspectionLookupError
+} = await supabaseClient
+  .from("inspections")
+  .select("id")
+  .eq("inspection_number", snapshot.inspectionNumber)
+  .single();
+
+if (inspectionLookupError || !savedInspection) {
+  console.error(
+    "Could not retrieve saved inspection ID:",
+    inspectionLookupError
+  );
+
+  applyStateToForm();
+  setSaveStatus(
+    "Inspection saved – results not saved"
+  );
+  return;
+}
+
+const resultRows = [];
+
+let displayOrder = 0;
+
+inspectionDefinition.forEach((section) => {
+  section.items.forEach((itemLabel, itemIndex) => {
+    const itemKey = makeItemId(
+      section.id,
+      itemIndex
+    );
+
+    const result =
+      snapshot.results?.[itemKey] || {};
+
+    resultRows.push({
+      inspection_id: savedInspection.id,
+      owner_id: user.id,
+      item_key: itemKey,
+      category: section.title,
+      item_label: itemLabel,
+      display_order: displayOrder,
+      status: result.status || "unmarked",
+      measurement_notes:
+        result.notes || "",
+      updated_at: now
+    });
+
+    displayOrder += 1;
+  });
+});
+
+const { error: deleteResultsError } =
+  await supabaseClient
+    .from("inspection_results")
+    .delete()
+    .eq(
+      "inspection_id",
+      savedInspection.id
+    );
+
+if (deleteResultsError) {
+  console.error(
+    "Could not replace inspection results:",
+    deleteResultsError
+  );
+
+  applyStateToForm();
+  setSaveStatus(
+    "Inspection saved – results save failed"
+  );
+  return;
+}
+
+const { error: resultsError } =
+  await supabaseClient
+    .from("inspection_results")
+    .insert(resultRows);
+
+if (resultsError) {
+  console.error(
+    "Supabase inspection results save failed:",
+    resultsError
+  );
+
+  applyStateToForm();
+  setSaveStatus(
+    "Inspection saved – results save failed"
+  );
+  return;
+}  
   applyStateToForm();
 
   setSaveStatus(
-    "Inspection saved to cloud"
+    "Inspection and results saved to cloud"
   );
 }
 
