@@ -972,58 +972,59 @@ function scheduleAutosave() {
       autosaveInspection,
       400
     );
-}
+}}
 
-function saveInspection() {
-
+async function saveInspection() {
   collectFormState();
 
-  const now =
-    new Date().toISOString();
+  setSaveStatus("Saving...");
+
+  const {
+    data: { user },
+    error: userError
+  } = await supabaseClient.auth.getUser();
+
+  if (userError || !user) {
+    setSaveStatus("Save failed — not signed in");
+    return;
+  }
+
+  const now = new Date().toISOString();
 
   if (!inspectionState.inspectionNumber) {
-
-    inspectionState.inspectionNumber =
-      generateInspectionNumber();
-
+    inspectionState.inspectionNumber = generateInspectionNumber();
     inspectionState.createdAt = now;
   }
 
   inspectionState.updatedAt = now;
 
-  const savedInspections =
-    readStorage(
-      STORAGE_KEYS.saved,
-      []
-    );
+  const snapshot = cloneInspectionState();
 
-  const snapshot =
-    cloneInspectionState();
+  // Keep a local saved copy for recovery/offline protection.
+  const savedInspections = readStorage(
+    STORAGE_KEYS.saved,
+    []
+  );
 
-  const existingIndex =
-    savedInspections.findIndex(
-      (inspection) =>
-        inspection.inspectionNumber ===
-        snapshot.inspectionNumber
-    );
+  const existingIndex = savedInspections.findIndex(
+    (inspection) =>
+      inspection.inspectionNumber ===
+      snapshot.inspectionNumber
+  );
 
   if (existingIndex >= 0) {
-
-    savedInspections[existingIndex] =
-      snapshot;
-
+    savedInspections[existingIndex] = snapshot;
   } else {
-
     savedInspections.unshift(snapshot);
   }
 
-  const saved =
-    writeStorage(
-      STORAGE_KEYS.saved,
-      savedInspections
-    );
+  const localSaved = writeStorage(
+    STORAGE_KEYS.saved,
+    savedInspections
+  );
 
-  if (!saved) {
+  if (!localSaved) {
+    setSaveStatus("Local backup failed");
     return;
   }
 
@@ -1032,9 +1033,78 @@ function saveInspection() {
     snapshot
   );
 
+  const cloudRecord = {
+  inspection_number: snapshot.inspectionNumber,
+  owner_id: user.id,
+  status: snapshot.status || "draft",
+
+  customer_name: snapshot.vehicle?.customerName || "",
+  customer_phone: snapshot.vehicle?.customerPhone || "",
+  inspection_date: snapshot.vehicle?.inspectionDate || null,
+  repair_order: snapshot.vehicle?.repairOrder || "",
+  technician: snapshot.vehicle?.technician || "",
+
+  vehicle_year: snapshot.vehicle?.vehicleYear
+    ? Number(snapshot.vehicle.vehicleYear)
+    : null,
+
+  vehicle_make: snapshot.vehicle?.vehicleMake || "",
+  vehicle_model: snapshot.vehicle?.vehicleModel || "",
+
+  vehicle_mileage: snapshot.vehicle?.vehicleMileage
+    ? Number(snapshot.vehicle.vehicleMileage)
+    : null,
+
+  vehicle_vin: snapshot.vehicle?.vehicleVin || "",
+  license_plate: snapshot.vehicle?.licensePlate || "",
+  registration_state:
+    snapshot.vehicle?.registrationState || "",
+
+  technician_summary:
+    snapshot.technicianSummary || "",
+
+  priority_repairs:
+    snapshot.priorityRepairs || "",
+
+  technician_signature:
+    snapshot.technicianSignature || "",
+
+  customer_advised:
+    Boolean(snapshot.customerAdvised),
+
+  created_at: snapshot.createdAt,
+  updated_at: snapshot.updatedAt
+};    
+
+  const { error: cloudError } = await supabaseClient
+  .from("inspections")
+  .upsert(
+    cloudRecord,
+    {
+      onConflict: "inspection_number"
+    }
+  );
+  
+  if (cloudError) {
+    console.error(
+      "Supabase inspection save failed:",
+      cloudError
+    );
+
+    applyStateToForm();
+
+    setSaveStatus(
+      "Saved locally — cloud save failed"
+    );
+
+    return;
+  }
+
   applyStateToForm();
 
-  setSaveStatus("Inspection saved");
+  setSaveStatus(
+    "Inspection saved to cloud"
+  );
 }
 
 function resetInspectionState() {
