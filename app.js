@@ -972,7 +972,7 @@ function scheduleAutosave() {
       autosaveInspection,
       400
     );
-}}
+}
 
 async function saveInspection() {
   collectFormState();
