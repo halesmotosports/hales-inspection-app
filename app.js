@@ -1428,8 +1428,7 @@ function getSavedInspectionDescription(
   return description;
 }
 
-function showSavedInspections() {
-
+async function showSavedInspections() {
   const panel =
     document.getElementById(
       "savedInspectionsPanel"
@@ -1438,12 +1437,6 @@ function showSavedInspections() {
   if (!panel) {
     return;
   }
-
-  const savedInspections =
-    readStorage(
-      STORAGE_KEYS.saved,
-      []
-    );
 
   panel.innerHTML = "";
   panel.hidden = false;
@@ -1493,8 +1486,71 @@ function showSavedInspections() {
   content.appendChild(heading);
   content.appendChild(closeButton);
 
-  if (!savedInspections.length) {
+  const loadingMessage =
+    createElement(
+      "p",
+      "",
+      "Loading saved inspections..."
+    );
 
+  content.appendChild(loadingMessage);
+  panel.appendChild(content);
+
+  const {
+    data: { user },
+    error: userError
+  } = await supabaseClient.auth.getUser();
+
+  if (userError || !user) {
+    loadingMessage.textContent =
+      "Unable to load saved inspections — not signed in.";
+    return;
+  }
+
+  const {
+    data: savedInspections,
+    error: inspectionsError
+  } = await supabaseClient
+    .from("inspections")
+    .select(
+      `
+        id,
+        inspection_number,
+        status,
+        customer_name,
+        inspection_date,
+        repair_order,
+        vehicle_year,
+        vehicle_make,
+        vehicle_model,
+        updated_at
+      `
+    )
+    .eq("owner_id", user.id)
+    .order("updated_at", {
+      ascending: false
+    });
+
+  loadingMessage.remove();
+
+  if (inspectionsError) {
+    console.error(
+      "Could not load saved inspections:",
+      inspectionsError
+    );
+
+    content.appendChild(
+      createElement(
+        "p",
+        "",
+        "Saved inspections could not be loaded."
+      )
+    );
+
+    return;
+  }
+
+  if (!savedInspections?.length) {
     content.appendChild(
       createElement(
         "p",
@@ -1503,99 +1559,106 @@ function showSavedInspections() {
       )
     );
 
-  } else {
-
-    savedInspections.forEach(
-      (inspection) => {
-
-        const row =
-          createElement(
-            "div",
-            "saved-inspection-row"
-          );
-
-        row.style.display = "grid";
-        row.style.gridTemplateColumns =
-          "1fr auto auto";
-        row.style.gap = "10px";
-        row.style.alignItems = "center";
-        row.style.borderTop =
-          "1px solid #dddddd";
-        row.style.padding = "14px 0";
-
-        const info =
-          createElement(
-            "div",
-            "saved-inspection-info"
-          );
-
-        const number =
-          createElement(
-            "strong",
-            "",
-            inspection.inspectionNumber
-          );
-
-        const description =
-          createElement(
-            "div",
-            "",
-            getSavedInspectionDescription(
-              inspection
-            )
-          );
-
-        info.appendChild(number);
-        info.appendChild(description);
-
-        const openButton =
-          createElement(
-            "button",
-            "",
-            "Open"
-          );
-
-        openButton.type = "button";
-
-        openButton.addEventListener(
-          "click",
-          () => {
-            openSavedInspection(
-              inspection.inspectionNumber
-            );
-          }
-        );
-
-        const deleteButton =
-          createElement(
-            "button",
-            "",
-            "Delete"
-          );
-
-        deleteButton.type = "button";
-
-        deleteButton.addEventListener(
-          "click",
-          () => {
-            deleteSavedInspection(
-              inspection.inspectionNumber
-            );
-          }
-        );
-
-        row.appendChild(info);
-        row.appendChild(openButton);
-        row.appendChild(deleteButton);
-
-        content.appendChild(row);
-      }
-    );
+    return;
   }
 
-  panel.appendChild(content);
-}
+  savedInspections.forEach(
+    (inspection) => {
+      const row =
+        createElement(
+          "div",
+          "saved-inspection-row"
+        );
 
+      row.style.display = "grid";
+      row.style.gridTemplateColumns =
+        "1fr auto";
+      row.style.gap = "10px";
+      row.style.alignItems = "center";
+      row.style.borderTop =
+        "1px solid #dddddd";
+      row.style.padding = "14px 0";
+
+      const info =
+        createElement(
+          "div",
+          "saved-inspection-info"
+        );
+
+      const number =
+        createElement(
+          "strong",
+          "",
+          inspection.inspection_number
+        );
+
+      const descriptionParts = [];
+
+      if (inspection.customer_name) {
+        descriptionParts.push(
+          inspection.customer_name
+        );
+      }
+
+      const vehicle = [
+        inspection.vehicle_year,
+        inspection.vehicle_make,
+        inspection.vehicle_model
+      ]
+        .filter(Boolean)
+        .join(" ");
+
+      if (vehicle) {
+        descriptionParts.push(vehicle);
+      }
+
+      if (inspection.inspection_date) {
+        descriptionParts.push(
+          inspection.inspection_date
+        );
+      }
+
+      if (inspection.repair_order) {
+        descriptionParts.push(
+          `RO: ${inspection.repair_order}`
+        );
+      }
+
+      const description =
+        createElement(
+          "div",
+          "",
+          descriptionParts.join(" • ")
+        );
+
+      info.appendChild(number);
+      info.appendChild(description);
+
+      const openButton =
+        createElement(
+          "button",
+          "",
+          "Open"
+        );
+
+      openButton.type = "button";
+
+      openButton.addEventListener(
+        "click",
+        () => {
+          openCloudInspection(
+            inspection.inspection_number
+          );
+        }
+      );
+
+      row.appendChild(info);
+      row.appendChild(openButton);
+
+      content.appendChild(row);
+    }
+  );
+}
 function configurePersistence() {
 
   vehicleFieldIds.forEach(
