@@ -15,8 +15,17 @@
   Media, persistent saved inspections, cloud storage,
   customer reports, and finalization are added in later stages.
 */
+// ============================================================
+// SUPABASE CONFIGURATION
+// ============================================================
 
+const SUPABASE_URL = "https://kvjxiqeohnodrxjpsnfj.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_QdbihJ6tGgPHlW8-_qRDIg_SbOz5TIV";
 
+const supabaseClient = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_PUBLISHABLE_KEY
+);
 // ============================================================
 // INSPECTION DEFINITION
 // ============================================================
