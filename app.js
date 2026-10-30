@@ -485,7 +485,7 @@ scheduleAutosave();    }
 // ============================================================
 // CATEGORY MEDIA PLACEHOLDER
 // ============================================================
-}
+
 function buildMediaArea(section) {
   const mediaArea = createElement(
     "div",
