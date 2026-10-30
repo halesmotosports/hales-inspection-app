@@ -1657,6 +1657,12 @@ function loadInspectionState(savedState) {
   });
 }
 
+  if (inspectionState.inspectionNumber) {
+    inspectionDefinition.forEach((section) => {
+      loadInspectionMedia(section.id);
+    });
+  }
+
 function autosaveInspection() {
 
   collectFormState();
