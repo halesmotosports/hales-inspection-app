@@ -389,3 +389,105 @@ button {
     -webkit-print-color-adjust: exact;
   }
 }
+
+/* ============================================================
+   V2 INSPECTION MEDIA GALLERY
+   ============================================================ */
+
+.section-media {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #d7d7d7;
+}
+
+.section-media-heading {
+  margin: 0 0 6px;
+}
+
+.section-media-description {
+  margin: 0 0 12px;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.media-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 200px));
+  gap: 14px;
+  margin: 12px 0;
+  align-items: start;
+}
+
+.media-tile {
+  width: 100%;
+  max-width: 200px;
+  padding: 8px;
+  box-sizing: border-box;
+  border: 1px solid #d7d7d7;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.media-preview {
+  width: 100%;
+  height: 130px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: #111;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.media-preview img,
+.media-preview video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  object-fit: cover;
+}
+
+.media-preview img {
+  cursor: pointer;
+}
+
+.media-tile-controls {
+  margin-top: 8px;
+}
+
+.media-tile-controls textarea {
+  display: block;
+  width: 100%;
+  min-height: 55px;
+  box-sizing: border-box;
+  resize: vertical;
+  margin-bottom: 8px;
+}
+
+.media-tile-controls label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-size: 0.85rem;
+}
+
+.media-tile-controls button {
+  width: 100%;
+}
+
+@media (max-width: 600px) {
+  .media-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .media-tile {
+    max-width: none;
+  }
+
+  .media-preview {
+    height: 110px;
+  }
+}
