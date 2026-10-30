@@ -485,78 +485,792 @@ scheduleAutosave();    }
 // ============================================================
 // CATEGORY MEDIA PLACEHOLDER
 // ============================================================
-
+}
 function buildMediaArea(section) {
+  const mediaArea = createElement(
+    "div",
+    "section-media"
+  );
 
-  const mediaArea =
-    createElement(
-      "div",
-      "section-media"
-    );
+  mediaArea.dataset.sectionId = section.id;
 
-  mediaArea.dataset.sectionId =
-    section.id;
+  const heading = createElement(
+    "div",
+    "section-media-heading",
+    "Inspection Media"
+  );
 
+  const explanation = createElement(
+    "p",
+    "section-media-description",
+    "Add photos or videos for this inspection category."
+  );
 
-  const heading =
-    createElement(
-      "div",
-      "section-media-heading",
-      "Inspection Media"
-    );
+  const mediaGrid = createElement(
+    "div",
+    "media-grid"
+  );
 
+  mediaGrid.id = `media-${section.id}`;
 
-  const explanation =
-    createElement(
-      "p",
-      "section-media-description",
-      "Photos and videos for this category will appear here."
-    );
+  const fileInput = document.createElement("input");
+  fileInput.type = "file";
+  fileInput.accept = "image/*,video/*";
+  fileInput.multiple = true;
+  fileInput.hidden = true;
+  fileInput.id = `media-input-${section.id}`;
 
-
-  const mediaGrid =
-    createElement(
-      "div",
-      "media-grid"
-    );
-
-  mediaGrid.id =
-    `media-${section.id}`;
-
-
-  const addMediaButton =
-    createElement(
-      "button",
-      "add-media-button",
-      "Add Photo / Video"
-    );
+  const addMediaButton = createElement(
+    "button",
+    "add-media-button",
+    "Add Photo / Video"
+  );
 
   addMediaButton.type = "button";
 
-  /*
-    Media functionality is intentionally disabled
-    during Stage 1.
+  addMediaButton.addEventListener(
+    "click",
+    () => {
+      fileInput.click();
+    }
+  );
 
-    We are creating the correct UI location now so
-    photos/videos can be added without restructuring
-    the inspection later.
-  */
+  fileInput.addEventListener(
+    "change",
+    async () => {
+      const files = Array.from(
+        fileInput.files || []
+      );
 
-  addMediaButton.disabled = true;
+      if (!files.length) {
+        return;
+      }
 
-  addMediaButton.title =
-    "Photo and video support will be enabled in the media stage.";
+      addMediaButton.disabled = true;
+      addMediaButton.textContent = "Uploading...";
 
+      try {
+        for (const file of files) {
+          await uploadInspectionMedia(
+            section,
+            file
+          );
+        }
+
+        await loadInspectionMedia(
+          section.id
+        );
+      } catch (error) {
+        console.error(
+          "Media upload failed:",
+          error
+        );
+
+        alert(
+          error?.message ||
+          "The photo or video could not be uploaded."
+        );
+      } finally {
+        fileInput.value = "";
+        addMediaButton.disabled = false;
+        addMediaButton.textContent =
+          "Add Photo / Video";
+      }
+    }
+  );
 
   mediaArea.appendChild(heading);
   mediaArea.appendChild(explanation);
   mediaArea.appendChild(mediaGrid);
+  mediaArea.appendChild(fileInput);
   mediaArea.appendChild(addMediaButton);
 
   return mediaArea;
 }
 
+// ============================================================
+// INSPECTION MEDIA — SUPABASE
+// ============================================================
 
+async function getInspectionMediaContext() {
+  const {
+    data: { user },
+    error: userError
+  } = await supabaseClient.auth.getUser();
+
+  if (userError || !user) {
+    throw new Error(
+      "You must be signed in to use inspection media."
+    );
+  }
+
+  collectFormState();
+
+  if (!inspectionState.inspectionNumber) {
+    await saveInspection();
+  }
+
+  if (!inspectionState.inspectionNumber) {
+    throw new Error(
+      "The inspection must be saved before adding media."
+    );
+  }
+
+  const {
+    data: inspection,
+    error: inspectionError
+  } = await supabaseClient
+    .from("inspections")
+    .select("id, inspection_number")
+    .eq(
+      "inspection_number",
+      inspectionState.inspectionNumber
+    )
+    .eq("owner_id", user.id)
+    .single();
+
+  if (inspectionError || !inspection) {
+    console.error(
+      "Could not retrieve inspection for media:",
+      inspectionError
+    );
+
+    throw new Error(
+      "The inspection could not be found in cloud storage."
+    );
+  }
+
+  return {
+    user,
+    inspection
+  };
+}
+
+
+function makeSafeFilename(filename) {
+  const dotIndex =
+    filename.lastIndexOf(".");
+
+  const extension =
+    dotIndex >= 0
+      ? filename.slice(dotIndex).toLowerCase()
+      : "";
+
+  const baseName =
+    dotIndex >= 0
+      ? filename.slice(0, dotIndex)
+      : filename;
+
+  const safeBase =
+    baseName
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60) || "media";
+
+  return `${safeBase}${extension}`;
+}
+
+
+async function uploadInspectionMedia(
+  section,
+  file
+) {
+  if (
+    !file.type.startsWith("image/") &&
+    !file.type.startsWith("video/")
+  ) {
+    throw new Error(
+      `${file.name} is not a supported photo or video.`
+    );
+  }
+
+  setSaveStatus("Uploading media...");
+
+  const {
+    user,
+    inspection
+  } = await getInspectionMediaContext();
+
+  const mediaType =
+    file.type.startsWith("video/")
+      ? "video"
+      : "photo";
+
+  const safeFilename =
+    makeSafeFilename(file.name);
+
+  const uniqueFilename =
+    `${crypto.randomUUID()}-${safeFilename}`;
+
+  const storagePath =
+    `${user.id}/${inspection.id}/${uniqueFilename}`;
+
+  const {
+    error: uploadError
+  } = await supabaseClient.storage
+    .from("inspection-media")
+    .upload(
+      storagePath,
+      file,
+      {
+        contentType:
+          file.type ||
+          "application/octet-stream",
+        upsert: false
+      }
+    );
+
+  if (uploadError) {
+    console.error(
+      "Media storage upload failed:",
+      uploadError
+    );
+
+    setSaveStatus("Media upload failed");
+
+    throw uploadError;
+  }
+
+  const {
+    data: existingMedia,
+    error: orderError
+  } = await supabaseClient
+    .from("inspection_media")
+    .select("display_order")
+    .eq(
+      "inspection_id",
+      inspection.id
+    )
+    .eq(
+      "category",
+      section.id
+    )
+    .order(
+      "display_order",
+      { ascending: false }
+    )
+    .limit(1);
+
+  if (orderError) {
+    console.error(
+      "Could not determine media order:",
+      orderError
+    );
+  }
+
+  const displayOrder =
+    existingMedia &&
+    existingMedia.length
+      ? Number(
+          existingMedia[0].display_order
+        ) + 1
+      : 0;
+
+  const now =
+    new Date().toISOString();
+
+  const mediaRecord = {
+    inspection_id: inspection.id,
+    owner_id: user.id,
+    category: section.id,
+    media_type: mediaType,
+    storage_path: storagePath,
+    original_filename: file.name,
+    mime_type:
+      file.type ||
+      "application/octet-stream",
+    file_size_bytes: file.size,
+    technician_caption: "",
+    customer_visible: false,
+    display_order: displayOrder,
+    created_at: now,
+    updated_at: now
+  };
+
+  const {
+    error: metadataError
+  } = await supabaseClient
+    .from("inspection_media")
+    .insert(mediaRecord);
+
+  if (metadataError) {
+    console.error(
+      "Media metadata save failed:",
+      metadataError
+    );
+
+    await supabaseClient.storage
+      .from("inspection-media")
+      .remove([storagePath]);
+
+    setSaveStatus(
+      "Media upload failed"
+    );
+
+    throw metadataError;
+  }
+
+  setSaveStatus("Media uploaded");
+}
+
+
+async function loadInspectionMedia(
+  sectionId
+) {
+  const mediaGrid =
+    document.getElementById(
+      `media-${sectionId}`
+    );
+
+  if (!mediaGrid) {
+    return;
+  }
+
+  mediaGrid.innerHTML = "";
+
+  if (!inspectionState.inspectionNumber) {
+    return;
+  }
+
+  let context;
+
+  try {
+    context =
+      await getInspectionMediaContext();
+  } catch (error) {
+    console.error(
+      "Could not load media context:",
+      error
+    );
+
+    return;
+  }
+
+  const {
+    inspection
+  } = context;
+
+  const {
+    data: mediaRecords,
+    error: mediaError
+  } = await supabaseClient
+    .from("inspection_media")
+    .select("*")
+    .eq(
+      "inspection_id",
+      inspection.id
+    )
+    .eq(
+      "category",
+      sectionId
+    )
+    .order(
+      "display_order",
+      { ascending: true }
+    );
+
+  if (mediaError) {
+    console.error(
+      "Could not load inspection media:",
+      mediaError
+    );
+
+    return;
+  }
+
+  for (
+    const media of mediaRecords || []
+  ) {
+    await renderInspectionMedia(
+      mediaGrid,
+      media
+    );
+  }
+}
+
+
+async function getMediaSignedUrl(
+  storagePath
+) {
+  const {
+    data,
+    error
+  } = await supabaseClient.storage
+    .from("inspection-media")
+    .createSignedUrl(
+      storagePath,
+      3600
+    );
+
+  if (error || !data?.signedUrl) {
+    console.error(
+      "Could not create media URL:",
+      error
+    );
+
+    return null;
+  }
+
+  return data.signedUrl;
+}
+
+
+async function renderInspectionMedia(
+  mediaGrid,
+  media
+) {
+  const signedUrl =
+    await getMediaSignedUrl(
+      media.storage_path
+    );
+
+  if (!signedUrl) {
+    return;
+  }
+
+  const tile =
+    createElement(
+      "div",
+      "media-tile"
+    );
+
+  tile.dataset.mediaId = media.id;
+
+  const preview =
+    createElement(
+      "div",
+      "media-preview"
+    );
+
+  if (media.media_type === "video") {
+    const video =
+      document.createElement("video");
+
+    video.src = signedUrl;
+    video.controls = true;
+    video.preload = "metadata";
+    video.playsInline = true;
+
+    preview.appendChild(video);
+  } else {
+    const image =
+      document.createElement("img");
+
+    image.src = signedUrl;
+    image.alt =
+      media.original_filename ||
+      "Inspection photo";
+
+    image.loading = "lazy";
+
+    image.addEventListener(
+      "click",
+      () => {
+        openMediaViewer(
+          signedUrl,
+          "photo"
+        );
+      }
+    );
+
+    preview.appendChild(image);
+  }
+
+  const controls =
+    createElement(
+      "div",
+      "media-tile-controls"
+    );
+
+  const caption =
+    document.createElement(
+      "textarea"
+    );
+
+  caption.className =
+    "media-caption";
+
+  caption.placeholder =
+    "Technician caption / note";
+
+  caption.value =
+    media.technician_caption || "";
+
+  let captionTimer = null;
+
+  caption.addEventListener(
+    "input",
+    () => {
+      clearTimeout(captionTimer);
+
+      captionTimer =
+        setTimeout(
+          async () => {
+            await updateInspectionMedia(
+              media.id,
+              {
+                technician_caption:
+                  caption.value
+              }
+            );
+          },
+          500
+        );
+    }
+  );
+
+  const visibilityLabel =
+    createElement(
+      "label",
+      "media-visibility"
+    );
+
+  const visibilityCheckbox =
+    document.createElement("input");
+
+  visibilityCheckbox.type =
+    "checkbox";
+
+  visibilityCheckbox.checked =
+    Boolean(
+      media.customer_visible
+    );
+
+  const visibilityText =
+    document.createTextNode(
+      " Include in customer report"
+    );
+
+  visibilityCheckbox.addEventListener(
+    "change",
+    async () => {
+      await updateInspectionMedia(
+        media.id,
+        {
+          customer_visible:
+            visibilityCheckbox.checked
+        }
+      );
+    }
+  );
+
+  visibilityLabel.appendChild(
+    visibilityCheckbox
+  );
+
+  visibilityLabel.appendChild(
+    visibilityText
+  );
+
+  const deleteButton =
+    createElement(
+      "button",
+      "media-delete-button",
+      "Delete"
+    );
+
+  deleteButton.type = "button";
+
+  deleteButton.addEventListener(
+    "click",
+    async () => {
+      const confirmed =
+        window.confirm(
+          "Delete this inspection photo or video?"
+        );
+
+      if (!confirmed) {
+        return;
+      }
+
+      deleteButton.disabled = true;
+
+      try {
+        await deleteInspectionMedia(
+          media
+        );
+
+        tile.remove();
+      } catch (error) {
+        console.error(
+          "Media delete failed:",
+          error
+        );
+
+        alert(
+          error?.message ||
+          "The media could not be deleted."
+        );
+
+        deleteButton.disabled = false;
+      }
+    }
+  );
+
+  controls.appendChild(caption);
+  controls.appendChild(
+    visibilityLabel
+  );
+  controls.appendChild(
+    deleteButton
+  );
+
+  tile.appendChild(preview);
+  tile.appendChild(controls);
+
+  mediaGrid.appendChild(tile);
+}
+
+
+async function updateInspectionMedia(
+  mediaId,
+  changes
+) {
+  const now =
+    new Date().toISOString();
+
+  const {
+    error
+  } = await supabaseClient
+    .from("inspection_media")
+    .update({
+      ...changes,
+      updated_at: now
+    })
+    .eq("id", mediaId);
+
+  if (error) {
+    console.error(
+      "Could not update media:",
+      error
+    );
+
+    setSaveStatus(
+      "Media update failed"
+    );
+
+    return false;
+  }
+
+  setSaveStatus("Media updated");
+
+  return true;
+}
+
+
+async function deleteInspectionMedia(
+  media
+) {
+  setSaveStatus("Deleting media...");
+
+  const {
+    error: storageError
+  } = await supabaseClient.storage
+    .from("inspection-media")
+    .remove([
+      media.storage_path
+    ]);
+
+  if (storageError) {
+    console.error(
+      "Could not delete media file:",
+      storageError
+    );
+
+    setSaveStatus(
+      "Media delete failed"
+    );
+
+    throw storageError;
+  }
+
+  const {
+    error: databaseError
+  } = await supabaseClient
+    .from("inspection_media")
+    .delete()
+    .eq("id", media.id);
+
+  if (databaseError) {
+    console.error(
+      "Could not delete media record:",
+      databaseError
+    );
+
+    setSaveStatus(
+      "Media record delete failed"
+    );
+
+    throw databaseError;
+  }
+
+  setSaveStatus("Media deleted");
+}
+
+
+function openMediaViewer(
+  url,
+  mediaType
+) {
+  const viewer =
+    document.getElementById(
+      "mediaViewer"
+    );
+
+  if (!viewer) {
+    if (mediaType === "photo") {
+      window.open(
+        url,
+        "_blank",
+        "noopener"
+      );
+    }
+
+    return;
+  }
+
+  viewer.innerHTML = "";
+
+  const closeButton =
+    createElement(
+      "button",
+      "media-viewer-close",
+      "Close"
+    );
+
+  closeButton.type = "button";
+
+  const closeViewer = () => {
+    viewer.hidden = true;
+    viewer.innerHTML = "";
+  };
+
+  closeButton.addEventListener(
+    "click",
+    closeViewer
+  );
+
+  let mediaElement;
+
+  if (mediaType === "video") {
+    mediaElement =
+      document.createElement("video");
+
+    mediaElement.controls = true;
+    mediaElement.playsInline = true;
+  } else {
+    mediaElement =
+      document.createElement("img");
+  }
+
+  mediaElement.src = url;
+
+  viewer.appendChild(closeButton);
+  viewer.appendChild(mediaElement);
+
+  viewer.hidden = false;
+}
 // ============================================================
 // INSPECTION SECTION
 // ============================================================
