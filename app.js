@@ -1134,7 +1134,7 @@ inspectionDefinition.forEach((section) => {
     );
 
     const result =
-      snapshot.results?.[itemKey] || {};
+      snapshot.items?.[itemKey] || {};
 
     resultRows.push({
       inspection_id: savedInspection.id,
