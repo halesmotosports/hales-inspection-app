@@ -1662,6 +1662,7 @@ function loadInspectionState(savedState) {
       loadInspectionMedia(section.id);
     });
   }
+}
 
 function autosaveInspection() {
 
