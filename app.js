@@ -1784,7 +1784,7 @@ async function saveInspection() {
     snapshot.technicianSignature || "",
 
   customer_advised:
-    Boolean(snapshot.customerAdvised),
+      snapshot.customerAdvised === "yes",
 
   created_at: snapshot.createdAt,
   updated_at: snapshot.updatedAt
@@ -2190,7 +2190,9 @@ async function openCloudInspection(
       inspection.technician_signature || "",
 
     customerAdvised:
-      Boolean(inspection.customer_advised),
+        inspection.customer_advised === true
+          ? "yes"
+          : "no",
 
     createdAt:
       inspection.created_at || null,
